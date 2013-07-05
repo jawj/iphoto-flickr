@@ -11,7 +11,7 @@ Incrementally backs up the contents of an iPhoto library to Flickr. This is espe
 
 More specifically, it:
 
-* Uses Applescript to get a list of all photos in the top-level Photos section of iPhoto, and all 'regular' albums (i.e. not smart or automatic ones, like Events or Faces)
+* Uses AppleScript to get a list of all photos in the top-level Photos section of iPhoto, and all 'regular' albums (i.e. not smart or automatic ones, like Events or Faces)
 * Uploads to Flickr any photo it hasn't already done that to
 * Creates a photoset on Flickr for any album it hasn't already done that for, adding all appropriate photos
 * Adds any photo in an album for which it's already created a photoset to that photoset if it hasn't already done so
