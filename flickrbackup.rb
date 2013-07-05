@@ -3,6 +3,9 @@
 
 %w{flickraw tempfile fileutils yaml}.each { |lib| require lib }
 
+dataDirName = File.expand_path "~/Library/Application Support/flickrbackup"
+FileUtils.mkpath dataDirName
+
 ID_SEP = ' -> '
 AS_SEP = "\u0000"
 
@@ -37,11 +40,8 @@ def sleepAsNecessary(startTime)
   sleep timeToSleep if timeToSleep > 0
 end
 
-dataDirName = File.expand_path "~/Library/Application Support/flickrbackup"
-FileUtils.mkpath dataDirName
 
-
-# load or get credentials
+# load or get Flickr credentials
 
 credentialsFileName = "#{dataDirName}/credentials.yaml"
 
@@ -200,7 +200,9 @@ open(uploadedPhotosFileName, 'a') do |uploadedPhotosFile|
     begin
       print "#{i + 1}. Uploading '#{photoPath}' ... "
       flickrID = flickr.upload_photo photoPath
-    rescue => err  # keep trying in face of network errors: Timeout::Error, Errno::BROKEN_PIPE, SocketError, ...
+      
+    # keep trying in face of network errors: Timeout::Error, Errno::BROKEN_PIPE, SocketError, ...
+    rescue => err  
       print "#{err.message}: retrying in 10s "; 10.times { sleep 1; print '.' }; puts
       retry
     end
