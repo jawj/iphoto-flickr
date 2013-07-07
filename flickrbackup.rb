@@ -208,14 +208,10 @@ open(uploadedPhotosFileName, 'a') do |uploadedPhotosFile|
       retry
     end
     puts appendToIDsFile(uploadedPhotosFile, iPhotoID, flickrID)
+    uploadedPhotosHash[iPhotoID] = flickrID  # in case this photo is in albums later
 
   end
 end
-
-
-# reload uploaded photo records (in case we need to add any newly-uploaded photos to albums)
-
-uploadedPhotosHash = loadIDsFileNamed uploadedPhotosFileName
 
 
 # update albums/photosets
