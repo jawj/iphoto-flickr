@@ -34,10 +34,13 @@ def loadASOutputFileNamed(fileName)
   open(fileName, 'rb:utf-16be:utf-8').each_line(AS_SEP).map { |datum| datum.chomp AS_SEP }
 end
 
-def sleepAsNecessary(startTime)
+def takeLongEnough
+  startTime = Time.now
+  returnValue = yield
   timeTaken = Time.now - startTime
   timeToSleep = 1.01 - timeTaken  # rate limit to just under 3600 reqs/hour
   sleep timeToSleep if timeToSleep > 0
+  returnValue
 end
 
 
@@ -195,22 +198,24 @@ open(uploadedPhotosFileName, 'a') do |uploadedPhotosFile|
 
   newPhotoData.each_with_index do |photoData, i|
     iPhotoID, photoPath = photoData
-    lastTime = Time.now
-      
+    
     begin
       print "#{i + 1}. Uploading '#{photoPath}' ... "
-      flickrID = flickr.upload_photo photoPath
-      
+      flickrID = takeLongEnough { flickr.upload_photo photoPath }
     # keep trying in face of network errors: Timeout::Error, Errno::BROKEN_PIPE, SocketError, ...
     rescue => err  
       print "#{err.message}: retrying in 10s "; 10.times { sleep 1; print '.' }; puts
       retry
     end
-
     puts appendToIDsFile(uploadedPhotosFile, iPhotoID, flickrID)
-    sleepAsNecessary lastTime
+
   end
 end
+
+
+# reload uploaded photo records (in case we need to add any newly-uploaded photos to albums)
+
+uploadedPhotosHash = loadIDsFileNamed uploadedPhotosFileName
 
 
 # update albums/photosets
@@ -224,21 +229,17 @@ open(photosInAlbumsFileName, 'a') do |photosInAlbumsFile|
     photosetID = createdAlbumsHash[albumID]
 
     if photosetID.nil?
-      # create photoset
-      lastTime = Time.now
 
       flickrPhotoIDs = album[:photoIDs].map { |id| uploadedPhotosHash[id] }
       print "Creating new photoset: '#{album[:name]}' ... "
-      photosetID = flickr.photosets.create(title: album[:name], primary_photo_id: flickrPhotoIDs.first).id
+      photosetID = takeLongEnough { flickr.photosets.create(title: album[:name], primary_photo_id: flickrPhotoIDs.first).id }
       puts appendToIDsFile(createdAlbumsFile, albumID, photosetID)
 
       print "Adding #{flickrPhotoIDs.length} photos to new photoset ... "
-      flickr.photosets.editPhotos(photoset_id: photosetID, photo_ids: flickrPhotoIDs.join(','), primary_photo_id: flickrPhotoIDs.first)
+      takeLongEnough { flickr.photosets.editPhotos(photoset_id: photosetID, photo_ids: flickrPhotoIDs.join(','), primary_photo_id: flickrPhotoIDs.first) }
       album[:photoIDs].each { |iPhotoID| appendToIDsFile(photosInAlbumsFile, iPhotoID, albumID, false) }
       photosInAlbumsFile.fsync
       puts "done"
-
-      sleepAsNecessary lastTime
 
     else
       # add any new photos
@@ -247,15 +248,11 @@ open(photosInAlbumsFileName, 'a') do |photosInAlbumsFile|
         photoIsInAlbum = albumsForPhoto && albumsForPhoto[albumID]
 
         unless photoIsInAlbum
-          lastTime = Time.now
-
           flickrPhotoID = uploadedPhotosHash[iPhotoID]
           print "Adding photo #{iPhotoID} -> #{flickrPhotoID} to photoset #{albumID} -> #{photosetID} ... "
-          flickr.photosets.addPhoto(photoset_id: photosetID, photo_id: flickrPhotoID)
+          takeLongEnough { flickr.photosets.addPhoto(photoset_id: photosetID, photo_id: flickrPhotoID) }
           appendToIDsFile(photosInAlbumsFile, iPhotoID, albumID)
           puts "done"
-
-          sleepAsNecessary lastTime
         end
       end
 
