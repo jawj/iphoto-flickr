@@ -182,13 +182,13 @@ albumEnum = rawAlbumData.each
 albumData = {}
 loop do
   albumEnum.next while albumEnum.peek.empty?
-  albumId       = albumEnum.next.to_f.to_i.to_s
-  albumName     = albumEnum.next
-  albumPhotoIds = []
+  albumId = albumEnum.next.to_f.to_i.to_s
+  albumName = albumEnum.next
+  albumData[albumId] = {name: albumName, photoIDs: []}
+  albumPhotoIds = albumData[albumId][:photoIDs]
   while not (nextId = albumEnum.next).empty?
     albumPhotoIds << nextId.to_f.to_i.to_s
   end
-  albumData[albumId] = {name: albumName, photoIDs: albumPhotoIds} unless albumPhotoIds.empty?
 end
 
 
@@ -202,6 +202,7 @@ open(uploadedPhotosFileName, 'a') do |uploadedPhotosFile|
     begin
       print "#{i + 1}. Uploading '#{photoPath}' ... "
       flickrID = takeLongEnough { flickr.upload_photo photoPath }
+    
     # keep trying in face of network errors: Timeout::Error, Errno::BROKEN_PIPE, SocketError, ...
     rescue => err  
       print "#{err.message}: retrying in 10s "; 10.times { sleep 1; print '.' }; puts
@@ -225,34 +226,57 @@ open(photosInAlbumsFileName, 'a') do |photosInAlbumsFile|
     photosetID = createdAlbumsHash[albumID]
 
     if photosetID.nil?
-
-      flickrPhotoIDs = album[:photoIDs].map { |id| uploadedPhotosHash[id] }
       print "Creating new photoset: '#{album[:name]}' ... "
-      photosetID = takeLongEnough { flickr.photosets.create(title: album[:name], primary_photo_id: flickrPhotoIDs.first).id }
-      puts appendToIDsFile(createdAlbumsFile, albumID, photosetID)
-
-      print "Adding #{flickrPhotoIDs.length} photos to new photoset ... "
-      takeLongEnough { flickr.photosets.editPhotos(photoset_id: photosetID, photo_ids: flickrPhotoIDs.join(','), primary_photo_id: flickrPhotoIDs.first) }
-      album[:photoIDs].each { |iPhotoID| appendToIDsFile(photosInAlbumsFile, iPhotoID, albumID, false) }
-      photosInAlbumsFile.fsync
-      puts "done"
-
-    else
-      # add any new photos
-      album[:photoIDs].each do |iPhotoID|
-        albumsForPhoto = photosInAlbumsHash[iPhotoID]
-        photoIsInAlbum = albumsForPhoto && albumsForPhoto[albumID]
-
-        unless photoIsInAlbum
-          flickrPhotoID = uploadedPhotosHash[iPhotoID]
-          print "Adding photo #{iPhotoID} -> #{flickrPhotoID} to photoset #{albumID} -> #{photosetID} ... "
-          takeLongEnough { flickr.photosets.addPhoto(photoset_id: photosetID, photo_id: flickrPhotoID) }
-          appendToIDsFile(photosInAlbumsFile, iPhotoID, albumID)
-          puts "done"
+      firstPhotoID = album[:photoIDs].first
+      firstFlickrPhotoID = uploadedPhotosHash[firstPhotoID]
+      begin
+        photosetID = takeLongEnough { flickr.photosets.create(title: album[:name], primary_photo_id: firstFlickrPhotoID).id }
+      
+      rescue FlickRaw::FailedResponse => e
+        if e.code == 2
+          # 2 = photo not found: photoset cannot be created if first photo has since been deleted from Flickr
+          photosetID = 'X'
+          print e.msg, ' ... '
+        else
+          puts 'error'
+          raise e
         end
       end
 
+      puts appendToIDsFile(createdAlbumsFile, albumID, photosetID)
     end
+
+    # add any new photos
+    album[:photoIDs].each do |iPhotoID|
+      albumsForPhoto = photosInAlbumsHash[iPhotoID]
+      photoIsInAlbum = albumsForPhoto && albumsForPhoto[albumID]
+
+      unless photoIsInAlbum
+        flickrPhotoID = uploadedPhotosHash[iPhotoID]
+        print "Adding photo #{iPhotoID} -> #{flickrPhotoID} to photoset #{albumID} -> #{photosetID} ... "
+        errorHappened = false
+
+        begin
+          takeLongEnough { flickr.photosets.addPhoto(photoset_id: photosetID, photo_id: flickrPhotoID) }
+        
+        rescue FlickRaw::FailedResponse => e
+          if [1, 2, 3].include? e.code  
+            # 1 = photoset not found, 2 = photo not found, 3 = photo already in photoset
+            # 1, 2 may occur if user has deleted photo and/or photoset from Flickr since uploaded/created
+            # 3 will occur for first photo in a newly-created photoset (since already added as primary photo)
+            puts e.msg
+            errorHappened = true
+          else
+            puts 'error'
+            raise e
+          end
+        end
+
+        puts "done" unless errorHappened
+        appendToIDsFile(photosInAlbumsFile, iPhotoID, albumID)
+      end
+    end
+
   end
 
 end
