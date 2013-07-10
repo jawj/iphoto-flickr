@@ -1,13 +1,32 @@
 #!/usr/bin/env ruby
 # encoding: utf-8
 
-%w{flickraw tempfile fileutils yaml}.each { |lib| require lib }
+%w{flickraw-cached tempfile fileutils yaml}.each { |lib| require lib }
 
 dataDirName = File.expand_path "~/Library/Application Support/flickrbackup"
 FileUtils.mkpath dataDirName
 
 ID_SEP = ' -> '
 AS_SEP = "\u0000"
+
+class StoredStringHash
+  def initialize(fileName)
+    @hash = {}
+    FileUtils.touch fileName
+    open(fileName).each_line do |line|
+      a, b = line.chomp.split ID_SEP
+      self[a] = b
+    end
+    open(fileName, 'a') do |f|
+      @storage = f
+      yield self
+    end
+  end
+  def []=(value)
+    
+  end
+  %w([]).each { |m| define_method(m) { |*args| @hash.send(m, *args) } }
+end
 
 def loadIDsFileNamed(fileName, many2many = false)
   FileUtils.touch fileName
@@ -217,6 +236,10 @@ end
 
 # update albums/photosets
 
+SET_NOT_FOUND         = 1
+PHOTO_NOT_FOUND       = 2
+PHOTO_ALREADY_IN_SET  = 3
+
 puts "\n#{albumData.length} standard albums in iPhoto\n"
 
 open(createdAlbumsFileName, 'a') do |createdAlbumsFile|
@@ -227,22 +250,19 @@ open(photosInAlbumsFileName, 'a') do |photosInAlbumsFile|
 
     if photosetID.nil?
       print "Creating new photoset: '#{album[:name]}' ... "
-      firstPhotoID = album[:photoIDs].first
-      firstFlickrPhotoID = uploadedPhotosHash[firstPhotoID]
+      somePhotoID = album[:photoIDs].first
+      someFlickrPhotoID = uploadedPhotosHash[somePhotoID]
+
       begin
-        photosetID = takeLongEnough { flickr.photosets.create(title: album[:name], primary_photo_id: firstFlickrPhotoID).id }
-      
+        photosetID = takeLongEnough { flickr.photosets.create(title: album[:name], primary_photo_id: someFlickrPhotoID).id }     
       rescue FlickRaw::FailedResponse => e
-        if e.code == 2
-          # 2 = photo not found: photoset cannot be created if first photo has since been deleted from Flickr
-          photosetID = 'X'
+        if e.code == PHOTO_NOT_FOUND  # photoset cannot be created if primary photo has been deleted from Flickr
           print e.msg, ' ... '
-        else
-          puts 'error'
-          raise e
+          photosetID = 'X'
+        else raise e
         end
       end
-
+# ADD RECORDS OF PRIMARY PHOTO BEING ADDED -- & REMOVE PHOTO_ALREADY_IN_SET BELOW?
       puts appendToIDsFile(createdAlbumsFile, albumID, photosetID)
     end
 
@@ -258,17 +278,11 @@ open(photosInAlbumsFileName, 'a') do |photosInAlbumsFile|
 
         begin
           takeLongEnough { flickr.photosets.addPhoto(photoset_id: photosetID, photo_id: flickrPhotoID) }
-        
         rescue FlickRaw::FailedResponse => e
-          if [1, 2, 3].include? e.code  
-            # 1 = photoset not found, 2 = photo not found, 3 = photo already in photoset
-            # 1, 2 may occur if user has deleted photo and/or photoset from Flickr since uploaded/created
-            # 3 will occur for first photo in a newly-created photoset (since already added as primary photo)
+          if [SET_NOT_FOUND, PHOTO_NOT_FOUND, PHOTO_ALREADY_IN_SET].include? e.code  
             puts e.msg
             errorHappened = true
-          else
-            puts 'error'
-            raise e
+          else raise e
           end
         end
 
