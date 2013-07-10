@@ -14,18 +14,33 @@ class StoredStringHash
     @hash = {}
     FileUtils.touch fileName
     open(fileName).each_line do |line|
-      a, b = line.chomp.split ID_SEP
-      self[a] = b
+      k, v = line.chomp.split ID_SEP
+      @hash[k] = v
     end
     open(fileName, 'a') do |f|
       @storage = f
       yield self
     end
   end
-  def []=(value)
-    
+  def add(k, v, fsync = true)
+    @hash[k] = v
+    dataRecord = "#{id1}#{ID_SEP}#{id2}"
+    @storage.puts dataRecord
+    fp.fsync if fsync
+    dataRecord
   end
-  %w([]).each { |m| define_method(m) { |*args| @hash.send(m, *args) } }
+  def get(k)
+    @hash[k]
+  end
+end
+
+class StoredAssociations < StoredStringHash
+  def associate(k, v)
+    @hash[[k, v].sort.join(':')] = 'Y'
+  end
+  def associated?(k, v)
+    @hash[[k, v].sort.join(':')]
+  end
 end
 
 def loadIDsFileNamed(fileName, many2many = false)
