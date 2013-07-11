@@ -23,18 +23,15 @@ class PersistedIDsHash
       yield self
     end
   end
-  def add(k, v, doFsync = true)
+  def add(k, v)
     store k, v
     record = "#{k}#{ID_SEP}#{v}"
     @file.puts record
-    fsync if doFsync
+    @file.fsync
     record
   end
   def get(k)
     @hash[k]
-  end
-  def fsync
-    @file.fsync
   end
 private
   def store(k, v)
