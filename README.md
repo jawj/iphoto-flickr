@@ -33,7 +33,7 @@ Limitations
 Installation
 ------------
 
-The (flickraw gem)[https://github.com/hanklords/flickraw] does all the heavy lifting on Flickr.
+The [flickraw gem](https://github.com/hanklords/flickraw) does all the heavy lifting on Flickr.
 
 1. Make sure you're a geek with a Mac
 2. Request an API key + secret from Flickr
