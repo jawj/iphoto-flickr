@@ -33,6 +33,8 @@ Limitations
 Installation
 ------------
 
+The (flickraw gem)[https://github.com/hanklords/flickraw] does all the heavy lifting on Flickr.
+
 1. Make sure you're a geek with a Mac
 2. Request an API key + secret from Flickr
 3. Install Ruby 1.9+ (unless you're on OS X 10.9+, which apparently bundles Ruby 2)
@@ -44,6 +46,30 @@ Usage
 -----
 
 `./flickrbackup.rb` and await further instructions.
+
+On first run you'll be prompted to authenticate with Flickr before backup proceeds. Your OAuth credentials are stored, so on subsequent runs you'll just see something like the following:
+
+<pre>Georges-MBP:flickrbackup George$ flickrbackup
+Authenticated as: george
+
+9025 photos in iPhoto library
+4 photos not yet uploaded to Flickr
+1. Uploading '/Users/George/Pictures/iPhoto Library/Previews/2013/07/08/20130708-215354/F6hf3i9DTFq0dXcULUNiQQ/IMG_2948.JPG' ... 4294991038 -> 9264815520
+2. Uploading '/Users/George/Pictures/iPhoto Library/Previews/2013/07/08/20130708-215354/p6NrRDroSci6hFvRgyi67A/IMG_2949.JPG' ... 4294991036 -> 9264816628
+3. Uploading '/Users/George/Pictures/iPhoto Library/Masters/2013/07/08/20130708-215318/IMG_0018.PNG' ... 4294991024 -> 9264817274
+4. Uploading '/Users/George/Pictures/iPhoto Library/Previews/2013/07/09/20130709-205846/xpgCtTqTQ+CkFbO0%5PrVA/IMG_2954.jpg' ... 4294991052 -> 9264818976
+
+65 standard albums in iPhoto
+Adding photo 4294991034 -> 9264801368 to photoset 4294976678 -> 72157634473345113 ... done
+Adding photo 4294991038 -> 9264815520 to photoset 4294976678 -> 72157634473345113 ... done
+Adding photo 4294991036 -> 9264816628 to photoset 4294976678 -> 72157634473345113 ... done
+Creating new photoset: 'Test album Thursday' ... 4294977929 -> 72157634599278172
+Adding photo 4294990998 -> 9230172174 to photoset 4294977929 -> 72157634599278172 ... done
+Adding photo 4294991034 -> 9264801368 to photoset 4294977929 -> 72157634599278172 ... done
+Adding photo 4294991038 -> 9264815520 to photoset 4294977929 -> 72157634599278172 ... done
+Adding photo 4294991036 -> 9264816628 to photoset 4294977929 -> 72157634599278172 ... done</pre>
+
+Arrows represent mappings from iPhoto object IDs to Flickr object IDs. All records are stored in `~/Library/Application Support/flickrbackup`.
 
 Support and feature requests
 ----------------------------

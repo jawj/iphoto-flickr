@@ -155,7 +155,7 @@ allPhotoData = allIDs.zip(allPaths)
 newPhotoData = allPhotoData.reject { |photoData| uploadedPhotos.get photoData.first }
 
 puts "\n#{allPhotoData.length} photos in iPhoto library"
-puts "#{newPhotoData.length} photos not yet uploaded to flickr\n"
+puts "#{newPhotoData.length} photos not yet uploaded to Flickr\n"
 
 
 # get all iPhoto albums and associated photo IDs
@@ -290,3 +290,4 @@ albumData.each do |albumID, album|
 end
 
 end; end; end  # own records blocks
+puts  # I prefer some whitespace before the prompt
