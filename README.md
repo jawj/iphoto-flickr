@@ -18,6 +18,8 @@ More specifically, it:
 
 It makes no more than 1 request/second to the API, in line with Flickr's limit of 3600 requests/hour.
 
+Hats off to the [flickraw gem](https://github.com/hanklords/flickraw) for doing all the Flickr donkey work.
+
 Strengths
 ---------
 
@@ -32,8 +34,6 @@ Limitations
 
 Installation
 ------------
-
-The [flickraw gem](https://github.com/hanklords/flickraw) does all the heavy lifting on Flickr.
 
 1. Make sure you're a geek with a Mac
 2. Request an API key + secret from Flickr
