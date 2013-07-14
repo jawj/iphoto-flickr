@@ -49,7 +49,7 @@ Usage
 
 On first run you'll be prompted to authenticate with Flickr before backup proceeds. Your OAuth credentials are stored, so on subsequent runs you'll just see something like the following:
 
-<pre>Georges-MBP:flickrbackup George$ flickrbackup
+<pre>Georges-MBP:flickrbackup George$ ./flickrbackup.rb
 Authenticated as: george
 
 9025 photos in iPhoto library
