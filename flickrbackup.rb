@@ -1,6 +1,12 @@
 #!/usr/bin/env ruby
 # encoding: utf-8
 
+# Copyright (c) George MacKerron 2013
+# Released under GPLv3: http://opensource.org/licenses/GPL-3.0
+
+# https://github.com/jawj/iphoto-flickr
+
+
 %w{flickraw-cached tempfile fileutils yaml}.each { |lib| require lib }
 
 
