@@ -79,4 +79,4 @@ I make no promises to enhance or support this script except in as far as it cont
 Licence
 -------
 
-http://opensource.org/licenses/MIT
+http://opensource.org/licenses/GPL-3.0
