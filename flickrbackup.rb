@@ -230,14 +230,16 @@ newPhotoData.each_with_index do |photoData, i|
   begin
     print "#{i + 1}. Uploading '#{photoPath}' ... "
     flickrID = rateLimit { flickr.upload_photo photoPath }
-  
+    puts uploadedPhotos.add iPhotoID, flickrID
+  rescue Errno::ENOENT => e #in case of missing files we can continue
+    puts e
+    puts
   # keep trying in face of network errors: Timeout::Error, Errno::BROKEN_PIPE, SocketError, ...
   rescue => err  
     print "#{err.message}: retrying in 10s "; 10.times { sleep 1; print '.' }; puts
     retry
   end
 
-  puts uploadedPhotos.add iPhotoID, flickrID
 end
 
 
