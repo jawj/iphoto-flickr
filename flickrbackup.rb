@@ -230,10 +230,13 @@ newPhotoData.each_with_index do |photoData, i|
   begin
     print "#{i + 1}. Uploading '#{photoPath}' ... "
     flickrID = rateLimit { flickr.upload_photo photoPath }
+    raise 'Invalid Flickr ID returned' unless flickrID.is_a? String  # this can happen, but I'm not yet sure what it means
     puts uploadedPhotos.add iPhotoID, flickrID
-  rescue Errno::ENOENT => e #in case of missing files we can continue
+  
+  rescue Errno::ENOENT => e  # in case of missing files, don't retry
     puts e
     puts
+
   # keep trying in face of network errors: Timeout::Error, Errno::BROKEN_PIPE, SocketError, ...
   rescue => err  
     print "#{err.message}: retrying in 10s "; 10.times { sleep 1; print '.' }; puts
@@ -259,7 +262,8 @@ albumData.each do |albumID, album|
     someFlickrPhotoID = uploadedPhotos.get somePhotoID
 
     begin
-      photosetID = rateLimit { flickr.photosets.create(title: album[:name], primary_photo_id: someFlickrPhotoID).id }     
+      photosetID = rateLimit { flickr.photosets.create(title: album[:name], primary_photo_id: someFlickrPhotoID).id }
+
     rescue FlickRaw::FailedResponse => e
       if e.code == PHOTO_NOT_FOUND  # photoset cannot be created if primary photo has been deleted from Flickr
         print e.msg, ' ... '
