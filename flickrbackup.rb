@@ -6,7 +6,6 @@
 # Copyright (c) George MacKerron 2013, http://mackerron.com
 # Released under GPLv3: http://opensource.org/licenses/GPL-3.0
 
-
 %w{flickraw-cached tempfile fileutils yaml}.each { |lib| require lib }
 
 
@@ -224,21 +223,25 @@ end
 
 # upload new files
 
+MAX_SIZE = 1024 ** 3
+class ErrTooBig < RuntimeError; def to_s; 'File is too big'; end; end
+
 newPhotoData.each_with_index do |photoData, i|
   iPhotoID, photoPath = photoData
-  
+ 
   begin
     print "#{i + 1}. Uploading '#{photoPath}' ... "
+    raise ErrTooBig if File.size(photoPath) > MAX_SIZE
     flickrID = rateLimit { flickr.upload_photo photoPath }
     raise 'Invalid Flickr ID returned' unless flickrID.is_a? String  # this can happen, but I'm not yet sure what it means
     puts uploadedPhotos.add iPhotoID, flickrID
   
-  rescue Errno::ENOENT => e  # in case of missing files, don't retry
+  rescue ErrTooBig, Errno::ENOENT, Errno::EINVAL => e  # in the face of missing/large/weird files, don't retry
     puts e
     puts
 
   # keep trying in face of network errors: Timeout::Error, Errno::BROKEN_PIPE, SocketError, ...
-  rescue => err  
+  rescue => err
     print "#{err.message}: retrying in 10s "; 10.times { sleep 1; print '.' }; puts
     retry
   end
