@@ -224,11 +224,14 @@ end
 # upload new files
 
 MAX_SIZE = 1024 ** 3
+MAX_RETRY = 3
+
 class ErrTooBig < RuntimeError; def to_s; 'File is too big'; end; end
 
 newPhotoData.each_with_index do |photoData, i|
   iPhotoID, photoPath = photoData
- 
+  r = 0
+
   begin
     print "#{i + 1}. Uploading '#{photoPath}' ... "
     raise ErrTooBig if File.size(photoPath) > MAX_SIZE
@@ -242,8 +245,13 @@ newPhotoData.each_with_index do |photoData, i|
 
   # keep trying in face of network errors: Timeout::Error, Errno::BROKEN_PIPE, SocketError, ...
   rescue => err
-    print "#{err.message}: retrying in 10s "; 10.times { sleep 1; print '.' }; puts
-    retry
+    r += 1
+    if r > MAX_RETRY
+      puts "photo skipped: max retry count exceeded"
+    else
+      print "#{err.message}: retrying in 10s "; 10.times { sleep 1; print '.' }; puts
+      retry
+    end
   end
 
 end
