@@ -14,7 +14,7 @@
 dataDirName = File.expand_path "~/Library/Application Support/flickrbackup"
 FileUtils.mkpath dataDirName
 
-class PersistedIDsHash
+class PersistedIDsHash  # in retrospect, perhaps this was a job for SQLite ...
   ID_SEP = ' -> '
   def initialize(fileName)
     @hash = {}
@@ -130,7 +130,7 @@ PersistedIDsHashMany.new("#{dataDirName}/photos-in-album-ids-map.txt") do |photo
 photosAS = %[
 on run argv
   set text item delimiters to ASCII character 0
-  tell application "iPhoto" to set snaps to {id, original path} of photos in photo library album
+  tell application "iPhoto" to set snaps to {id, original path, image path} of photos in photo library album
   
   set ids     to first item of snaps
   set idsFile to first item of argv
@@ -139,6 +139,10 @@ on run argv
   set paths     to second item of snaps
   set pathsFile to second item of argv
   writeUnicodeToPOSIXFile(pathsFile, paths as Unicode text)
+
+  set fallbackPaths     to third item of snaps
+  set fallbackPathsFile to third item of argv
+  writeUnicodeToPOSIXFile(fallbackPathsFile, fallbackPaths as Unicode text)
 end run
 
 on writeUnicodeToPOSIXFile(fileName, contents)
@@ -148,15 +152,14 @@ on writeUnicodeToPOSIXFile(fileName, contents)
 end writeToFile
 ]
 
-idsFile   = Tempfile.new 'ids'
-pathsFile = Tempfile.new 'paths'
-[idsFile, pathsFile].each { |f| f.close }
-applescript(photosAS, idsFile.path, pathsFile.path)
-allIDs   = loadOutputFile(idsFile).map { |id| id.to_f.to_i.to_s }
-allPaths = loadOutputFile(pathsFile)
-[idsFile, pathsFile].each { |f| f.unlink }
+idsFile, pathsFile, fallbackPathsFile = Tempfile.new('ids'), Tempfile.new('paths'), Tempfile.new('fallbackPaths')
+[idsFile, pathsFile, fallbackPathsFile].each { |f| f.close }
+applescript(photosAS, idsFile.path, pathsFile.path, fallbackPathsFile.path)
+allIDs = loadOutputFile(idsFile).map { |id| id.to_f.to_i.to_s }
+allPaths, allFallbackPaths = loadOutputFile(pathsFile), loadOutputFile(fallbackPathsFile)
+[idsFile, pathsFile, fallbackPathsFile].each { |f| f.unlink }
 
-allPhotoData = allIDs.zip(allPaths)
+allPhotoData = allIDs.zip(allPaths, allFallbackPaths)
 newPhotoData = allPhotoData.reject { |photoData| uploadedPhotos.get photoData.first }
 
 puts "\n#{allPhotoData.length} photos in iPhoto library"
@@ -229,8 +232,10 @@ MAX_RETRY = 3
 class ErrTooBig < RuntimeError; def to_s; 'File is too big'; end; end
 
 newPhotoData.each_with_index do |photoData, i|
-  iPhotoID, photoPath = photoData
-  r = 0
+  iPhotoID, photoPath, fallbackPhotoPath = photoData
+  photoPath = fallbackPhotoPath unless File.exist? photoPath  # fall back to 'image path' if 'original path' missing
+
+  retries = 0
 
   begin
     print "#{i + 1}. Uploading '#{photoPath}' ... "
@@ -245,9 +250,9 @@ newPhotoData.each_with_index do |photoData, i|
 
   # keep trying in face of network errors: Timeout::Error, Errno::BROKEN_PIPE, SocketError, ...
   rescue => err
-    r += 1
-    if r > MAX_RETRY
-      puts "photo skipped: max retry count exceeded"
+    retries += 1
+    if retries > MAX_RETRY
+      puts "skipped: retry count exceeded"
     else
       print "#{err.message}: retrying in 10s "; 10.times { sleep 1; print '.' }; puts
       retry
