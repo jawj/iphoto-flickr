@@ -163,7 +163,7 @@ allPhotoData = allIDs.zip(allPaths, allFallbackPaths)
 newPhotoData = allPhotoData.reject { |photoData| uploadedPhotos.get photoData.first }
 
 puts "\n#{allPhotoData.length} photos in iPhoto library"
-puts "#{newPhotoData.length} photos not yet uploaded to Flickr\n"
+puts "#{newPhotoData.length} photos not yet uploaded to Flickr\n\n"
 
 
 # get all iPhoto albums and associated photo IDs
@@ -269,7 +269,7 @@ end
 SET_NOT_FOUND   = 1
 PHOTO_NOT_FOUND = 2
 
-puts "\n#{albumData.length} standard albums in iPhoto\n"
+puts "\n#{albumData.length} standard albums in iPhoto\n\n"
 
 albumData.each do |albumID, album|
   photosetID = createdAlbums.get albumID
