@@ -129,7 +129,7 @@ PersistedIDsHashMany.new("#{dataDirName}/photos-in-album-ids-map.txt") do |photo
 
 photosAS = %[
 on run argv
-  set text item delimiters to ASCII character 0
+  set text item delimiters to character id 0
   tell application "iPhoto" to set snaps to {id, original path, image path} of photos in photo library album
   
   set ids     to first item of snaps
@@ -170,8 +170,8 @@ puts "#{newPhotoData.length} photos not yet uploaded to Flickr\n"
 
 albumsAS = %[
 on run argv
-  set text item delimiters to ASCII character 0
-  set nul to {"", ""} as Unicode text
+  set nul to character id 0
+  set text item delimiters to nul
 
   set albumsFile to first item of argv
   set fp to open for access (POSIX file albumsFile) with write permission
@@ -191,9 +191,11 @@ on run argv
             set albumId to anAlbum's id
 
             set albumData to {"", albumId, albumName, ""} as Unicode text
-            write albumData to fp as Unicode text
-            write albumPhotoIds to fp as Unicode text
-            write nul to fp as Unicode text
+            tell me
+              write albumData to fp as Unicode text
+              write albumPhotoIds to fp as Unicode text
+              write nul to fp as Unicode text
+            end tell
           end if
         end if
       end if
