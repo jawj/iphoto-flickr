@@ -70,11 +70,13 @@ end
 
 # Flickr API setup
 
+FlickRaw.secure = true
+
 credentialsFileName = "#{dataDirName}/credentials.yaml"
 
 if File.exist? credentialsFileName
   credentials = YAML.load_file credentialsFileName
-  FlickRaw.api_key        = credentials[:api_key] 
+  FlickRaw.api_key        = credentials[:api_key]
   FlickRaw.shared_secret  = credentials[:api_secret]
   flickr.access_token     = credentials[:access_token]
   flickr.access_secret    = credentials[:access_secret]
@@ -84,10 +86,10 @@ if File.exist? credentialsFileName
 else
   print "Flickr API key: "
   FlickRaw.api_key = gets.strip
-  
+
   print "Flickr API shared secret: "
   FlickRaw.shared_secret = gets.strip
-  
+
   token = flickr.get_request_token
   auth_url = flickr.get_authorize_url(token['oauth_token'], :perms => 'write')
   print "Authorise access to your Flickr account: press [Return] when ready"
@@ -100,8 +102,8 @@ else
   login = flickr.test.login
   puts "Authenticated as: #{login.username}"
 
-  credentials = {api_key:       FlickRaw.api_key, 
-                 api_secret:    FlickRaw.shared_secret, 
+  credentials = {api_key:       FlickRaw.api_key,
+                 api_secret:    FlickRaw.shared_secret,
                  access_token:  flickr.access_token,
                  access_secret: flickr.access_secret}
 
@@ -131,11 +133,11 @@ photosAS = %[
 on run argv
   set text item delimiters to character id 0
   tell application "iPhoto" to set snaps to {id, original path, image path} of photos in photo library album
-  
+
   set ids     to first item of snaps
   set idsFile to first item of argv
   writeUnicodeToPOSIXFile(idsFile, ids as Unicode text)
-  
+
   set paths     to second item of snaps
   set pathsFile to second item of argv
   writeUnicodeToPOSIXFile(pathsFile, paths as Unicode text)
@@ -245,7 +247,7 @@ newPhotoData.each_with_index do |photoData, i|
     flickrID = rateLimit { flickr.upload_photo photoPath }
     raise 'Invalid Flickr ID returned' unless flickrID.is_a? String  # this can happen, but I'm not yet sure what it means
     puts uploadedPhotos.add iPhotoID, flickrID
-  
+
   rescue ErrTooBig, Errno::ENOENT, Errno::EINVAL => e  # in the face of missing/large/weird files, don't retry
     puts e
     puts
@@ -305,7 +307,7 @@ albumData.each do |albumID, album|
       begin
         rateLimit { flickr.photosets.addPhoto(photoset_id: photosetID, photo_id: flickrPhotoID) }
       rescue FlickRaw::FailedResponse => e
-        if [SET_NOT_FOUND, PHOTO_NOT_FOUND].include? e.code  
+        if [SET_NOT_FOUND, PHOTO_NOT_FOUND].include? e.code
           puts e.msg
           errorHappened = true
         else raise e
