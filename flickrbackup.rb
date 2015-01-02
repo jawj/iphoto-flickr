@@ -131,20 +131,22 @@ PersistedIDsHashMany.new("#{dataDirName}/photos-in-album-ids-map.txt") do |photo
 
 photosAS = %[
 on run argv
-  set text item delimiters to character id 0
-  tell application "iPhoto" to set snaps to {id, original path, image path} of photos in photo library album
+  with timeout of 600 seconds
+    set text item delimiters to character id 0
+    tell application "iPhoto" to set snaps to {id, original path, image path} of photos in photo library album
 
-  set ids     to first item of snaps
-  set idsFile to first item of argv
-  writeUnicodeToPOSIXFile(idsFile, ids as Unicode text)
+    set ids     to first item of snaps
+    set idsFile to first item of argv
+    writeUnicodeToPOSIXFile(idsFile, ids as Unicode text)
 
-  set paths     to second item of snaps
-  set pathsFile to second item of argv
-  writeUnicodeToPOSIXFile(pathsFile, paths as Unicode text)
+    set paths     to second item of snaps
+    set pathsFile to second item of argv
+    writeUnicodeToPOSIXFile(pathsFile, paths as Unicode text)
 
-  set fallbackPaths     to third item of snaps
-  set fallbackPathsFile to third item of argv
-  writeUnicodeToPOSIXFile(fallbackPathsFile, fallbackPaths as Unicode text)
+    set fallbackPaths     to third item of snaps
+    set fallbackPathsFile to third item of argv
+    writeUnicodeToPOSIXFile(fallbackPathsFile, fallbackPaths as Unicode text)
+  end timeout
 end run
 
 on writeUnicodeToPOSIXFile(fileName, contents)
@@ -172,39 +174,41 @@ puts "#{newPhotoData.length} photos not yet uploaded to Flickr\n\n"
 
 albumsAS = %[
 on run argv
-  set nul to character id 0
-  set text item delimiters to nul
+  with timeout of 600 seconds
+    set nul to character id 0
+    set text item delimiters to nul
 
-  set albumsFile to first item of argv
-  set fp to open for access (POSIX file albumsFile) with write permission
+    set albumsFile to first item of argv
+    set fp to open for access (POSIX file albumsFile) with write permission
 
-  tell application "iPhoto"
-    repeat with anAlbum in albums
-      if anAlbum's type is regular album then
-        set albumName to anAlbum's name
-        if albumName is not "Last Import" then
-          set albumPhotoIds to (id of every photo of anAlbum) as Unicode text
-          if length of albumPhotoIds is greater than 0 then
-            set currentAlbum to anAlbum
-            repeat while currentAlbum's parent exists
-              set currentAlbum to currentAlbum's parent
-              set albumName to currentAlbum's name & " > " & albumName
-            end repeat
-            set albumId to anAlbum's id
+    tell application "iPhoto"
+      repeat with anAlbum in albums
+        if anAlbum's type is regular album then
+          set albumName to anAlbum's name
+          if albumName is not "Last Import" then
+            set albumPhotoIds to (id of every photo of anAlbum) as Unicode text
+            if length of albumPhotoIds is greater than 0 then
+              set currentAlbum to anAlbum
+              repeat while currentAlbum's parent exists
+                set currentAlbum to currentAlbum's parent
+                set albumName to currentAlbum's name & " > " & albumName
+              end repeat
+              set albumId to anAlbum's id
 
-            set albumData to {"", albumId, albumName, ""} as Unicode text
-            tell me
-              write albumData to fp as Unicode text
-              write albumPhotoIds to fp as Unicode text
-              write nul to fp as Unicode text
-            end tell
+              set albumData to {"", albumId, albumName, ""} as Unicode text
+              tell me
+                write albumData to fp as Unicode text
+                write albumPhotoIds to fp as Unicode text
+                write nul to fp as Unicode text
+              end tell
+            end if
           end if
         end if
-      end if
-    end repeat
-  end tell
+      end repeat
+    end tell
 
-  close access fp
+    close access fp
+  end timeout
 end run
 ]
 
