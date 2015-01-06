@@ -6,7 +6,13 @@
 # Copyright (c) George MacKerron 2013, http://mackerron.com
 # Released under GPLv3: http://opensource.org/licenses/GPL-3.0
 
-%w{flickraw-cached tempfile fileutils yaml}.each { |lib| require lib }
+
+%w{flickraw-cached tempfile fileutils yaml logger colorize}.each { |lib| require lib }
+
+logger = Logger.new STDOUT
+logger.formatter = proc { |severity, t, progname, msg| "#{t}  #{msg}" }
+
+puts
 
 
 # own records setup
@@ -75,13 +81,14 @@ FlickRaw.secure = true
 credentialsFileName = "#{dataDirName}/credentials.yaml"
 
 if File.exist? credentialsFileName
+  logger.info "Authenticating ...\n"
   credentials = YAML.load_file credentialsFileName
   FlickRaw.api_key        = credentials[:api_key]
   FlickRaw.shared_secret  = credentials[:api_secret]
   flickr.access_token     = credentials[:access_token]
   flickr.access_secret    = credentials[:access_secret]
   login = flickr.test.login
-  puts "Authenticated as: #{login.username}"
+  logger.info "Authenticated as: #{login.username}".green + "\n\n"
 
 else
   print "Flickr API key: "
@@ -100,7 +107,8 @@ else
   verify = gets.strip
   flickr.get_access_token(token['oauth_token'], token['oauth_token_secret'], verify)
   login = flickr.test.login
-  puts "Authenticated as: #{login.username}"
+  puts
+  logger.info "Authenticated as: #{login.username}".green + "\n\n"
 
   credentials = {api_key:       FlickRaw.api_key,
                  api_secret:    FlickRaw.shared_secret,
@@ -129,9 +137,11 @@ PersistedIDsHashMany.new("#{dataDirName}/photos-in-album-ids-map.txt") do |photo
 
 # get all iPhoto IDs and paths, and filter out those already backed up
 
+logger.info "Getting list of photos from iPhoto (could take a while) ...\n"
+
 photosAS = %[
 on run argv
-  with timeout of 600 seconds
+  with timeout of 3600 seconds
     set text item delimiters to character id 0
     tell application "iPhoto" to set snaps to {id, original path, image path} of photos in photo library album
 
@@ -166,15 +176,13 @@ allPaths, allFallbackPaths = loadOutputFile(pathsFile), loadOutputFile(fallbackP
 allPhotoData = allIDs.zip(allPaths, allFallbackPaths)
 newPhotoData = allPhotoData.reject { |photoData| uploadedPhotos.get photoData.first }
 
-puts "\n#{allPhotoData.length} photos in iPhoto library"
-puts "#{newPhotoData.length} photos not yet uploaded to Flickr\n\n"
-
-
 # get all iPhoto albums and associated photo IDs
+
+logger.info "Getting album data from iPhoto (could also take a while) ...\n\n"
 
 albumsAS = %[
 on run argv
-  with timeout of 600 seconds
+  with timeout of 3600 seconds
     set nul to character id 0
     set text item delimiters to nul
 
@@ -231,11 +239,15 @@ loop do
   end
 end
 
+logger.info "#{allPhotoData.length} photos and #{albumData.length} standard albums in iPhoto library\n"
+logger.info "#{newPhotoData.length} photos not yet uploaded to Flickr".green + "\n\n"
+
 
 # upload new files
 
-MAX_SIZE = 1024 ** 3
-MAX_RETRY = 3
+MAX_SIZE   = 1024 ** 3
+MAX_RETRY  = 6
+RETRY_WAIT = 10
 
 class ErrTooBig < RuntimeError; def to_s; 'File is too big'; end; end
 
@@ -246,23 +258,27 @@ newPhotoData.each_with_index do |photoData, i|
   retries = 0
 
   begin
-    print "#{i + 1}. Uploading '#{photoPath}' ... "
+    logger.info "(#{i + 1}/#{newPhotoData.length})  Uploading '#{photoPath}' ... "
     raise ErrTooBig if File.size(photoPath) > MAX_SIZE
     flickrID = rateLimit { flickr.upload_photo photoPath }
     raise 'Invalid Flickr ID returned' unless flickrID.is_a? String  # this can happen, but I'm not yet sure what it means
     puts uploadedPhotos.add iPhotoID, flickrID
 
-  rescue ErrTooBig, Errno::ENOENT, Errno::EINVAL => e  # in the face of missing/large/weird files, don't retry
-    puts e
-    puts
+  rescue ErrTooBig, Errno::ENOENT, Errno::EINVAL => err  # in the face of missing/large/weird files, don't retry
+    puts err.message.yellow
 
-  # keep trying in face of network errors: Timeout::Error, Errno::BROKEN_PIPE, SocketError, ...
+  # keep trying indefinitely in face of network errors
+  rescue Timeout::Error, Errno::EPIPE, SocketError => err
+    print "#{err.message}: retrying soon ".yellow; RETRY_WAIT.times { sleep 1; print '.' }; puts
+    retry
+
+  # other errors MAY or MAY NOT not be recoverable, so try a few times and then give up
   rescue => err
     retries += 1
     if retries > MAX_RETRY
-      puts "skipped: retry count exceeded"
+      puts "skipped: retry count exceeded".red
     else
-      print "#{err.message}: retrying in 10s "; 10.times { sleep 1; print '.' }; puts
+      print "#{err.message}: retrying soon (#{retries}/#{MAX_RETRY}) ".yellow; RETRY_WAIT.times { sleep 1; print '.' }; puts
       retry
     end
   end
@@ -275,13 +291,11 @@ end
 SET_NOT_FOUND   = 1
 PHOTO_NOT_FOUND = 2
 
-puts "\n#{albumData.length} standard albums in iPhoto\n\n"
-
 albumData.each do |albumID, album|
   photosetID = createdAlbums.get albumID
 
   if photosetID.nil?
-    print "Creating new photoset: '#{album[:name]}' ... "
+    logger.info "Creating new photoset: '#{album[:name]}' ... "
     somePhotoID = album[:photoIDs].first
     someFlickrPhotoID = uploadedPhotos.get somePhotoID
 
@@ -290,7 +304,7 @@ albumData.each do |albumID, album|
 
     rescue FlickRaw::FailedResponse => e
       if e.code == PHOTO_NOT_FOUND  # photoset cannot be created if primary photo has been deleted from Flickr
-        print e.msg, ' ... '
+        print e.msg.yellow, ' ... '
         photosetID = 'X'
       else raise e
       end
@@ -305,14 +319,14 @@ albumData.each do |albumID, album|
 
     unless photosInAlbums.associated? iPhotoID, albumID
       flickrPhotoID = uploadedPhotos.get iPhotoID
-      print "Adding photo #{iPhotoID} -> #{flickrPhotoID} to photoset #{albumID} -> #{photosetID} ... "
+      logger.info "Adding photo #{iPhotoID} -> #{flickrPhotoID} to photoset #{albumID} -> #{photosetID} ... "
       errorHappened = false
 
       begin
         rateLimit { flickr.photosets.addPhoto(photoset_id: photosetID, photo_id: flickrPhotoID) }
       rescue FlickRaw::FailedResponse => e
         if [SET_NOT_FOUND, PHOTO_NOT_FOUND].include? e.code
-          puts e.msg
+          puts e.msg.yellow
           errorHappened = true
         else raise e
         end
