@@ -38,7 +38,7 @@ Installation
 1. Make sure you're a geek with a Mac
 2. Request an API key + secret from Flickr
 3. Install Ruby 1.9+ (unless you're on OS X 10.9+, which apparently bundles Ruby 2)
-4. `gem install flickraw-cached`
+4. `gem install flickraw-cached colorize`
 5. `git clone https://github.com/jawj/flickrbackup.git`
 6. `chmod u+x flickrbackup.rb`
 
